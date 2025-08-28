@@ -12,7 +12,9 @@
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
     "check": "svelte-check --tsconfig ./tsconfig.json",
-    "postinstall": "wxt prepare"
+    "postinstall": "wxt prepare",
+    "submit:init": "wxt submit init",
+    "submit": "wxt submit --firefox-zip ./.output/discord-token-fix-0.0.0-firefox.zip --firefox-sources-zip ./.output/discord-token-fix-0.0.0-sources.zip"
   },
   "devDependencies": {
     "@tsconfig/svelte": "^5.0.4",
