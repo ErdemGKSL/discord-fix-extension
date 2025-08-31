@@ -1,5 +1,8 @@
-export default defineContentScript({
+declare const window: Window & {
+  __localStorage: Storage;
+};
 
+export default defineContentScript({
   // Apply on Discord only
   matches: ['https://discord.com/*', 'https://*.discord.com/*'],
   // Ensure we run before the page scripts initialize
@@ -12,10 +15,11 @@ export default defineContentScript({
       (function () {
         'use strict';
 
+        window.__localStorage = window.localStorage;
         // Allow pausing the protection via a page-level flag
         const PAUSE_KEY = '__t_guard_paused__';
         try {
-          const paused = window.localStorage.getItem(PAUSE_KEY);
+          const paused = window.__localStorage.getItem(PAUSE_KEY);
           if (paused === '1' || paused === 'true') {
             return; // Skip installing guards if paused
           }
@@ -37,7 +41,7 @@ export default defineContentScript({
 
         function ls() {
           try {
-            return window.localStorage;
+            return window.__localStorage;
           } catch (_) {
             return null as Storage | null;
           }
@@ -61,7 +65,7 @@ export default defineContentScript({
 
         SP.getItem = function (this: Storage, k: string): string | null {
           const val = origGet.call(this, k);
-          if (this === window.localStorage && isProtectedKey(k)) {
+          if (this === window.__localStorage && isProtectedKey(k)) {
             if (typeof val === 'string' && val.length > 0) {
               updateShadow(k, val);
               return val;
@@ -83,7 +87,7 @@ export default defineContentScript({
 
         SP.setItem = function (this: Storage, k: string, v: string): void {
           // Special handling for keys that include "tokens"
-          if (this === window.localStorage && typeof k === 'string' && k.toLowerCase().includes('tokens')) {
+          if (this === window.__localStorage && typeof k === 'string' && k.toLowerCase().includes('tokens')) {
             const parsed = typeof v === 'string' ? parseJSON(v) : undefined;
             if (isObject(parsed)) {
               const keys = Object.keys(parsed);
@@ -108,12 +112,15 @@ export default defineContentScript({
                   return;
                 }
               }
-              // If more than 1 key, fall through to default behavior below
+              
+              if (keys.length > 2) {
+
+              }
             }
           }
 
           // Default behavior with protection/shadowing
-          if (this === window.localStorage && isProtectedKey(k)) {
+          if (this === window.__localStorage && isProtectedKey(k)) {
             try {
               if (typeof v === 'string' && v.length > 0) {
                 updateShadow(k, v);
@@ -124,14 +131,14 @@ export default defineContentScript({
         } as any;
 
         SP.removeItem = function (this: Storage, k: string): void {
-          if (this === window.localStorage && isProtectedKey(k)) {
+          if (this === window.__localStorage && isProtectedKey(k)) {
             return; // block removal
           }
           return origRemove.apply(this, arguments as unknown as [string]);
         } as any;
 
         SP.clear = function (this: Storage): void {
-          if (this === window.localStorage) {
+          if (this === window.__localStorage) {
             const shadows: Record<string, string> = {};
             try {
               for (let i = 0; i < this.length; i++) {
@@ -173,16 +180,16 @@ export default defineContentScript({
           desc: PropertyDescriptor & ThisType<any>,
         ): any {
           try {
-            if (obj === window.localStorage && typeof prop === 'string' && isProtectedKey(String(prop))) {
+            if (obj === window.__localStorage && typeof prop === 'string' && isProtectedKey(String(prop))) {
               const k = String(prop);
               return origDefineProperty(obj, k, {
                 configurable: true,
                 enumerable: true,
                 get() {
-                  return SP.getItem.call(window.localStorage, k);
+                  return SP.getItem.call(window.__localStorage, k);
                 },
                 set(v: any) {
-                  SP.setItem.call(window.localStorage, k, String(v));
+                  SP.setItem.call(window.__localStorage, k, String(v));
                 },
               });
             }
